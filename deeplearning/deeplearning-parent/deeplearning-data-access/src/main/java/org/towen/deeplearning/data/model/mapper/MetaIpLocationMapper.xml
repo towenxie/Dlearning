@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.towen.deeplearning.data.dao.MetaIpLocationDao">
+    <resultMap id="metaIpLocationEntity" type="MetaIpLocationEntity">
+        <result column="begin" property="begin" />
+        <result column="end" property="end" />
+        <result column="country" property="country" />
+        <result column="province" property="province" />
+        <result column="district" property="district" />
+        <result column="city" property="city" />
+        <result column="net" property="net" />
+    </resultMap>
+
+    <select id="getMetaIpLocation" resultMap="metaIpLocationEntity">
+        <![CDATA[
+        SELECT
+        `country`,
+        `province`,
+        `city`,
+        `net`,
+        `district`
+        FROM meta_ip_location
+        WHERE begin <= #{ip} AND end >= #{ip}
+        ]]>
+    </select>
+
+    <update id="createMetaIpLocationTempTable">
+        <![CDATA[
+        CREATE TABLE IF NOT EXISTS `meta_ip_location_temp` (
+        `id` bigint(20) NOT NULL AUTO_INCREMENT,
+        `begin` bigint(20) NOT NULL,
+        `end` bigint(20) NOT NULL,
+        `country` varchar(255) DEFAULT NULL,
+        `province` varchar(255) DEFAULT NULL,
+        `city` varchar(255) DEFAULT NULL,
+        `net` varchar(1024) DEFAULT NULL,
+        `district` varchar(255) DEFAULT NULL,
+        PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+        ]]>
+    </update>
+
+    <update id="saveMetaIpLocationEntity" parameterType="list">
+        INSERT INTO `meta_ip_location_temp`
+        (
+        `begin`,
+        `end`,
+        `country`,
+        `province`,
+        `city`,
+        `net`,
+        `district`)
+        VALUES
+        <foreach collection="metaIpLocationEntities" index="index" item="item" separator=",">
+            (
+            #{item.begin},
+            #{item.end},
+            #{item.country},
+            #{item.province},
+            #{item.city},
+            #{item.net},
+            #{item.district}
+            )
+        </foreach>
+    </update>
+
+    <select id="createIndex">
+        <![CDATA[
+        CREATE INDEX idx_meta_ip_location_temp_1 ON meta_ip_location_temp (`begin`, `end`);
+        ]]>
+    </select>
+
+    <select id="updateMetaIpLocationTable">
+         <![CDATA[
+        UPDATE meta_ip_location AS meta
+        LEFT JOIN `meta_ip_location_temp` AS temp
+        ON
+        meta.`begin`=temp.`begin` AND meta.`end`=temp.`end`
+        AND (meta.country <> temp.country OR meta.province <> temp.province
+        OR meta.city <> temp.city OR meta.district <> temp.district OR meta.net <> temp.net)
+        SET
+        meta.country =
+        temp.country,
+        meta.province = temp.province,
+        meta.city = temp.city,
+        meta.district = temp.district,
+        meta.net =
+        temp.net,
+        updated_time = now()
+        WHERE temp.id IS NOT NULL AND meta.is_enabled=1;
+        ]]>
+    </select>
+    
+    <select id="updateMetaIpLocationIsEnable">
+        UPDATE meta_ip_location AS meta
+        LEFT JOIN `meta_ip_location_temp` AS temp
+        ON
+        meta.`begin`=temp.`begin` AND meta.`end`=temp.`end`
+        SET
+        meta.is_enabled = 0
+        WHERE temp.id IS NULL 
+        AND meta.is_enabled=1;
+    </select>
+
+    <select id="insertMetaIpLocationTable">
+        INSERT INTO meta_ip_location
+        (`begin`, `end`, `country`,
+        `province`, `city`, `net`,
+        `district`)
+        SELECT temp.`begin`, temp.`end`, temp.`country`,
+        temp.`province`, temp.`city`, temp.`net`,
+        temp.`district`
+        FROM
+        meta_ip_location_temp AS temp
+        LEFT JOIN `meta_ip_location` AS meta
+        ON meta.`begin`=temp.`begin` AND
+        meta.`end`=temp.`end`
+        WHERE meta.id IS NULL OR meta.is_enabled=0;
+    </select>
+    
+    <select id="dropIpTempTable">
+        DROP TABLE meta_ip_location_temp;
+    </select>
+</mapper>

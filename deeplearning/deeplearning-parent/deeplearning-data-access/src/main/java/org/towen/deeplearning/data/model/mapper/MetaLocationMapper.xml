@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.towen.deeplearning.data.dao.MetaLocationDao">
+    <resultMap id="metaLocationEntity" type="MetaLocationEntity">
+        <result column="id" property="id" />
+        <result column="code" property="code" />
+        <result column="country_name" property="countryName" />
+        <result column="state_name" property="stateName" />
+        <result column="city_name" property="cityName" />
+        <result column="region_name" property="regionName" />
+        <result column="whole_name" property="wholeName" />
+        <result column="level" property="level" />
+        <result column="parent_id" property="parentId" />
+        <result column="parent_code" property="parentCode" />
+        <result column="language" property="language" />
+        <result column="is_enabled" property="isEnabled" />
+        <result column="long" property="longitude" />
+        <result column="lat" property="latitude" />
+    </resultMap>
+
+    <select id="getMetaLocations" resultMap="metaLocationEntity">
+        <![CDATA[
+            SELECT * FROM `meta_location` WHERE code like'%CN%' AND is_enabled = 1
+        ]]>
+    </select>
+
+    <insert id="saveMetaLocations" parameterType="metaLocationEntity">
+        INSERT INTO `meta_location`
+        (`code`,
+        `country_name`,
+        `state_name`,
+        `city_name`,
+        `region_name`,
+        `whole_name`,
+        `level`,
+        `parent_code`)
+        VALUES
+        <foreach collection="metaLocationEntities" index="index"
+            item="item" separator=",">
+            (#{item.code},
+            #{item.countryName},
+            #{item.stateName},
+            #{item.cityName},
+            #{item.regionName},
+            #{item.wholeName},
+            #{item.level},
+            #{item.parentCode})
+        </foreach>
+    </insert>
+
+    <select id="updateMetaLocationParentCode">
+        UPDATE meta_location AS meta
+        LEFT JOIN
+        meta_location AS child
+        ON child.code = meta.parent_code
+        AND
+        child.is_enabled = 1
+        SET meta.parent_id = child.id
+        WHERE
+        meta.parent_id IS NULL AND meta.is_enabled = 1
+    </select>
+
+    <update id="updateMetaLocationGeo" parameterType="metaLocationEntity">
+        UPDATE
+        meta_location AS meta
+        SET meta.`long` = #{longitude},
+        meta.`lat` = #{latitude}
+        WHERE meta.id =#{id} AND meta.is_enabled = 1
+    </update>
+
+    <select id="getMetaLocationId" resultType="java.lang.Long">
+        <![CDATA[
+            SELECT id FROM `meta_location` WHERE ((`lat` BETWEEN #{minLat} AND #{maxLat}) AND (`long` BETWEEN #{minLng} AND #{maxLng}))
+        ]]>
+    </select>
+
+    <select id="getLocationIdByGeo" resultType="java.lang.Long">
+        <![CDATA[
+            { call usp_location_getLocationIdByGeo(#{latitude, mode=IN, jdbcType=BIGINT},#{longitude, mode=IN, jdbcType=BIGINT})}
+        ]]>
+    </select>
+</mapper>
